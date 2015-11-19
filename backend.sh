@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-MINION_ADMINISTRATOR_EMAIL="april@mozilla.com"
-MINION_ADMINISTRATOR_NAME="April King"
+MINION_ADMINISTRATOR_EMAIL="david.best@gsa.gov"
+MINION_ADMINISTRATOR_NAME="Dave Best"
 
 # The base directory for large pieces of the install
 MINION_BASE_DIRECTORY=/opt/minion
@@ -14,10 +14,22 @@ apt-get -y install curl \
   nmap \
   postfix \
   rabbitmq-server \
-  stunnel
+  stunnel \
+  wget \
+  vim
 
 # For some reason, it has trouble adding the rabbitmq groups
 apt-get -y install rabbitmq-server
+
+# OWASP ZAP
+apt-get --assume-yes install openjdk-7-jre
+wget https://github.com/zaproxy/zaproxy/releases/download/2.4.2/ZAP_2.4.2_Linux.tar.gz
+tar xvfz ZAP_2.4.2_Linux.tar.gz
+mv ZAP_2.4.2 /home/minion/zap
+rm ZAP_2.4.2_Linux.tar.gz
+
+export NESSUS_USER=XXX
+export NESSUS_PASS=YYY
 
 # First, source the virtualenv
 cd ${MINION_BASE_DIRECTORY}
@@ -34,11 +46,20 @@ python setup.py develop
 mkdir -p /etc/minion
 mv /tmp/backend.json /etc/minion
 mv /tmp/scan.json /etc/minion
+mv /tmp/zap-plugin.json /etc/minion
 
 # Install minion-nmap-plugin; comment out `git clone` if working on minion-nmap-plugin locally
 # via Vagrant synced folder
 git clone https://github.com/mozilla/minion-nmap-plugin ${MINION_BASE_DIRECTORY}/minion-nmap-plugin
 cd ${MINION_BASE_DIRECTORY}/minion-nmap-plugin
+python setup.py install
+
+git clone https://github.com/18F/minion-nessus-plugin ${MINION_BASE_DIRECTORY}/minion-nessus-plugin
+cd ${MINION_BASE_DIRECTORY}/minion-nessus-plugin
+python setup.py install
+
+git clone https://github.com/mozilla/minion-zap-plugin ${MINION_BASE_DIRECTORY}/minion-zap-plugin
+cd ${MINION_BASE_DIRECTORY}/minion-zap-plugin
 python setup.py install
 
 # Add the minion init scripts to the system startup scripts
@@ -51,6 +72,7 @@ update-rc.d minion defaults 40
 echo -e "\n# Minion convenience commands" >> ~minion/.bashrc
 echo -e "alias miniond=\"supervisord -c ${MINION_BASE_DIRECTORY}/minion-backend/etc/supervisord.conf\"" >> ~minion/.bashrc
 echo -e "alias minionctl=\"supervisorctl -c ${MINION_BASE_DIRECTORY}/minion-backend/etc/supervisord.conf\"" >> ~minion/.bashrc
+
 
 # Start MongoDB
 service mongodb start
